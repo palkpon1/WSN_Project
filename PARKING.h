@@ -10,13 +10,8 @@ enum {
 };
 
 typedef nx_struct node_msg {
-    nx_uint16_t command;
-    nx_uint16_t nodeid;
-    nx_uint16_t destid;
-    nx_uint16_t groupid;
-    nx_uint16_t size;
-    nx_uint16_t node_id[MAX_SIZE];
-    nx_uint16_t node_data[MAX_SIZE];
+    nx_uint16_t node_id;
+    nx_uint16_t random;
 } node_msg;
 
 #endif /* PARKING_H */

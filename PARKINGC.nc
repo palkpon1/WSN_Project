@@ -2,6 +2,7 @@
 #include "PARKING.h"
 #include "AM.h"
 #include "Serial.h"
+#include "printf.h"
 #include <stdio.h>
 
 module PARKINGC {
@@ -10,20 +11,22 @@ module PARKINGC {
     uses interface Leds;
     
     uses interface Timer<TMilli> as Timer0;
-    uses interface LocalTime<TMilli>;
     
     uses interface SplitControl as RadioControl;
-    uses interface SplitControl as SerialControl;
+    //uses interface SplitControl as SerialControl;
+    uses interface StdControl as RoutingControl;
     
-    uses interface Packet as RadioPacket;       //to create a packet
-    uses interface AMPacket as RadioAMPacket;   //To extract information out of packets
-    uses interface AMSend as RadioSend[am_id_t id];
-    uses interface Receive as RadioReceive[am_id_t id];
+    uses interface Packet;       //to create a packet
+    //uses interface AMPacket as RadioAMPacket;   //To extract information out of packets
+    uses interface Send;
+    uses interface Receive;
     
-    uses interface AMSend as UartSend[am_id_t id];
+    /*uses interface AMSend as UartSend[am_id_t id];
     uses interface Receive as UartReceive[am_id_t id];
     uses interface Packet as UartPacket;
-    uses interface AMPacket as UartAMPacket;
+    uses interface AMPacket as UartAMPacket;*/
+
+    uses interface RootControl;
 }
 
 implementation {
@@ -47,16 +50,16 @@ implementation {
     uint8_t    radioIn, radioOut;
     bool       radioBusy, radioFull;
     
-    message_t  uartQueueBufs[UART_QUEUE_LEN];
+    /*message_t  uartQueueBufs[UART_QUEUE_LEN];
     message_t  * ONE_NOK uartQueue[UART_QUEUE_LEN];
     uint8_t    uartIn, uartOut;
-    bool       uartBusy, uartFull;
+    bool       uartBusy, uartFull;*/
 
     //****************************************************************************
     //Prototypes
     //****************************************************************************
     task void RadioSendTask();
-    task void uartSendTask();
+    //task void uartSendTask();
 
     //****************************************************************************
     //internal functions
@@ -68,7 +71,7 @@ implementation {
     }
 
     void FailBlink() {
-        call Leds.led1Toggle();
+        call Leds.led2Toggle();
         dbg("LED", "FailBlink\n");
     }
     void SendBlink(am_addr_t dest) {
@@ -118,11 +121,11 @@ implementation {
 
         dbg ("BOOT", "Application booted (%d).\n", TOS_NODE_ID);
 
-        for (i = 0; i < UART_QUEUE_LEN; i++)
+        /*for (i = 0; i < UART_QUEUE_LEN; i++)
             uartQueue[i] = &uartQueueBufs[i];
         uartIn = uartOut = 0;
         uartBusy = FALSE;
-        uartFull = TRUE;
+        uartFull = TRUE;*/
     
         for (i = 0; i < RADIO_QUEUE_LEN; i++)
             radioQueue[i] = &radioQueueBufs[i];
@@ -131,9 +134,10 @@ implementation {
         radioBusy = FALSE;
         radioFull = TRUE;
 
-        //call RadioControl.start();
-    	if (call SerialControl.start() == EALREADY)
-      	    uartFull = FALSE;
+        if (call RadioControl.start() == EALREADY)
+            radioFull = FALSE;
+    	//if (call SerialControl.start() == EALREADY)
+      	    //uartFull = FALSE;
 
     }
     //**********
@@ -146,6 +150,11 @@ implementation {
         {
             dbg ("DBG", "Radio Started.\n");
             radioFull = FALSE;
+            call RoutingControl.start();
+            if (TOS_NODE_ID == 0)
+            	call RootControl.setRoot();
+	    else
+	        call Timer0.startPeriodic(2000);    	
         }
         else
         {
@@ -157,23 +166,24 @@ implementation {
     //*********
 
     event void RadioControl.stopDone(error_t err) {}
-    event void SerialControl.stopDone(error_t error) {}
+    //event void SerialControl.stopDone(error_t error) {}
     
-    event void SerialControl.startDone(error_t error) {
+    /*event void SerialControl.startDone(error_t error) {
       if (error == SUCCESS) {
         uartFull = FALSE;
       }
-    }
+    }*/
 
     //**********
     //Time Fired
     //*********
 
     event void Timer0.fired() {
-        
+    	call Leds.led1Toggle();
+        post RadioSendTask();
     }
 
-  message_t* receive(message_t *msg, void *payload, uint8_t len) {
+  /*message_t* receive(message_t *msg, void *payload, uint8_t len) {
     message_t *ret = msg;
 
     atomic {
@@ -229,7 +239,7 @@ implementation {
       call Leds.led1Toggle();
     else
       {
-	FailBlink();
+	//FailBlink();
 	post uartSendTask();
       }
   }
@@ -253,7 +263,7 @@ implementation {
 						   void *payload,
 						   uint8_t len) {
     message_t *ret = msg;
-	    FailBlink();
+    if(*((nx_uint16_t *) payload) == 3) call Leds.led0Toggle();
 
     atomic
       if (!radioFull)
@@ -276,37 +286,17 @@ implementation {
 	FailBlink();
     
     return ret;
-  }
+  }*/
     //**********
     //Radio Receive
     //*********
-    event message_t* RadioReceive.receive[am_id_t id](message_t* msg, void* payload, uint8_t len)
+    event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len)
     {
-        uint32_t localTime;
         if (len == sizeof(node_msg))
         {
             node_msg* btrpkt = (node_msg*)payload;
-            am_addr_t dest = call RadioAMPacket.destination(msg);
-
-            dbg("DBG", "Received a packet. Origin:%d, counter:%d, next hop:%d, timestamp:%d:\n", btrpkt->nodeid, btrpkt->counter, btrpkt->destid, btrpkt->time);
-
-            if (TOS_NODE_ID ==  dest)
-            {
-                if (TOS_NODE_ID == BASESTATION_ID)
-                {
-                    num_messages++;
-                    localTime = call LocalTime.get();
-                    delay = localTime;
-                    total_delay += delay;
-
-                    dbg("DBG", "Received a packet. LocalTime: %d, Timestamp of packet: %d, delay:%d\n", localTime, btrpkt->time, delay);
-                    dbg("DBG", "BS received a packet, statistics==> num_messages: %d, total_delay:%d, total_delay: %d\n",num_messages, total_delay, total_delay);
-                }
-            }
-            else   //not destined for me, drop it!
-            {
-                dbg("DROP", "Droped the packet__%d, %d, %d\n", btrpkt->nodeid, btrpkt->destid, btrpkt->time);
-            }
+            
+            printf("Here is an id: %u and a random %u\n", btrpkt->node_id, btrpkt->random);
         }
         else
         {
@@ -318,7 +308,7 @@ implementation {
     //Send Done
     //*********
 
-    event void RadioSend.sendDone[am_id_t id](message_t* msg, error_t error) {
+    event void Send.sendDone(message_t* msg, error_t error) {
         if (error != SUCCESS)
             FailBlink();
         else
@@ -330,7 +320,6 @@ implementation {
                 if (radioFull)
                     radioFull = FALSE;
             }
-            post RadioSendTask();
     }
 
     //*********************************************************************
@@ -338,7 +327,6 @@ implementation {
     //********************************************************************
     task void RadioSendTask() {
         uint8_t len;
-        am_addr_t addr;
         message_t* msg;
         node_msg *btrpkt;
 
@@ -351,16 +339,17 @@ implementation {
 
         msg = radioQueue[radioOut];
 
-        btrpkt = (node_msg*) (call RadioPacket.getPayload(radioQueue[radioOut], sizeof (node_msg)));
+        btrpkt = (node_msg*) (call RadioPacket.getPayload(msg, sizeof (node_msg)));
         dbg ("DBG", "nodeid:%d, parent:%d, counter:%d\n",btrpkt->nodeid, btrpkt->destid, btrpkt->counter);
+        
+        btrpkt->node_id = TOS_NODE_ID;
+        btrpkt->random = 105;
+        
         len = call RadioPacket.payloadLength(msg);
-        addr = call RadioAMPacket.destination(msg);
 
-        dbg("DBG", "len:%d, addr:%d\n",len,addr);
-
-        if (call RadioSend.send[call UartAMPacket.type(msg)](addr, msg, len) == SUCCESS)
+        if (call Send.send(msg, len) == SUCCESS)
         {
-            SendBlink(addr);
+            FailBlink();
         }
         else
         {
