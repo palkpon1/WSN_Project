@@ -61,10 +61,10 @@ implementation {
     sendBusy = FALSE;
   }
   
-  event message_t* 
-  Receive.receive(message_t* msg, void* payload, uint8_t len) {
+  event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     call Leds.led1Toggle();    
-    printf("%x: %x!", ((TestMsg*)payload)->id, ((TestMsg*)payload)->data);
+    printf("%x: %x!\n", ((TestMsg*)payload)->id, ((TestMsg*)payload)->data);
+    printfflush();
     return msg;
   }
 }
