@@ -1,0 +1,8 @@
+<metrics>
+  <ram>52</ram>
+  <iris-ram>52</iris-ram>
+  <flash>23128</flash>
+  <iris-flash>23128</iris-flash>
+  <stack>2044</stack>
+  <iris-stack>2044</iris-stack>
+</metrics>
