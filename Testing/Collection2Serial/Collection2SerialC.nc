@@ -10,6 +10,7 @@ module Collection2SerialC {
   uses interface Timer<TMilli>;
   uses interface RootControl;
   uses interface Receive;
+  uses interface Read<uint16_t>;
 }
 implementation {
   message_t packet;
@@ -38,10 +39,10 @@ implementation {
 
   event void RadioControl.stopDone(error_t err) {}
 
-  void sendMessage() {
+  void sendMessage(uint16_t data) {
     TestMsg* msg =
       (TestMsg*)call Send.getPayload(&packet, sizeof(TestMsg));
-    msg->data = 0xBEEF;
+    msg->data = data;
     msg->id = TOS_NODE_ID;
     
     if (call Send.send(&packet, sizeof(TestMsg)) != SUCCESS) 
@@ -52,7 +53,7 @@ implementation {
   event void Timer.fired() {
     call Leds.led2Toggle();
     if (!sendBusy)
-      sendMessage();
+      call Read.read();
   }
   
   event void Send.sendDone(message_t* m, error_t err) {
@@ -63,9 +64,16 @@ implementation {
   
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     call Leds.led1Toggle();    
-    printf("%x: %x!\n", ((TestMsg*)payload)->id, ((TestMsg*)payload)->data);
+    printf("%02i: %03x!\n", ((TestMsg*)payload)->id, ((TestMsg*)payload)->data);
     printfflush();
     return msg;
+  }
+
+  event void Read.readDone(error_t result, uint16_t data) 
+  {
+    if (result == SUCCESS){
+      sendMessage(data);
+    }
   }
 }
 
