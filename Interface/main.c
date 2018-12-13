@@ -46,8 +46,10 @@ int main(int argc, char **argv){
     char buffer[50];
     int8_t db[50];
     int8_t db_prev[50];
+    int8_t timeOutDB[50];
     for(int i = 0; i < 50; i++){
         db[i] = -1;
+        timeOutDB[i] = -1;
         db_prev[i] = -1;
     }
     while (keepRunning){
@@ -57,12 +59,17 @@ int main(int argc, char **argv){
         if (!packet)
             exit(0);
         
+        //printf("%s", packet + 8);
         sprintf(buffer, "%s", packet + 8);
-        if(ParseString(db, buffer, 0x30) == 1){
-            if(different(db, db_prev, 55)){
+        if(ParseString(db, timeOutDB, buffer, 50, 0x30, 10) == 1){
+            if(different(db, db_prev, 50)){
                 system("clear");
                 PrintDatabase(db, 50, 0);
             } 
+            /*for(int i = 0; i < 50; i++){
+                printf("%d ", timeOutDB[i]);
+            }
+            printf("\n");*/
             cpy(db_prev, db, 50);
         }
 

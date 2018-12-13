@@ -20,12 +20,17 @@ void PrintDatabase(int8_t* db, int size, int t){
             if(t){
                 printf("%s\t", timeStr);
             }
-            printf("%3d true\n", i);
+            printf("%3d Taken\n", i);
         }else if(db[i] == 0){
             if(t){
                 printf("%s\t", timeStr);
             }
-            printf("%3d false\n", i);
+            printf("%3d Available\n", i);
+        }else if(db[i] == 2){
+            if(t){
+                printf("%s\t", timeStr);
+            }
+            printf("%3d lost connection\n", i);
         }
     }
 }
@@ -57,7 +62,7 @@ int strSplit(char c, char* half1, char* half2, char* in){
     };
 }
 
-int ParseString(int8_t* db, char* input, int threshold){
+int ParseString(int8_t* db, int8_t* timeOutDB, char* input, int len, int threshold, int8_t timeOut){
     char half1[20];
     char half2[20];
     int spot = 0;
@@ -65,12 +70,23 @@ int ParseString(int8_t* db, char* input, int threshold){
     if(strSplit(':', half1, half2, input) != -1){
         half2[strlen(half2) - 2] = '\0';
         spot = atoi(half1);
-        lightValue = atoi(half2);
-        //printf("%d\t%03x\n", spot, lightValue);
-        if(lightValue > threshold){
-            db[spot] = 0;
+        if(spot == 1){
+            for(int i = 0; i < len; i++){
+                if(timeOutDB[i] > 0){
+                    timeOutDB[i]--;
+                }else if(timeOutDB[i] == 0){
+                    db[i] = 2;
+                }
+            }
         }else{
-            db[spot] = 1;
+            lightValue = atoi(half2);
+            timeOutDB[spot] = timeOut;
+            //printf("%d\t%03x\n", spot, lightValue);
+            if(lightValue > threshold){
+                db[spot] = 0;
+            }else{
+                db[spot] = 1;
+            }
         }
         return 1;
     }else{
