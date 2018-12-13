@@ -1,4 +1,4 @@
 all: Interface
 
 Interface:
-	gcc -g *.cpp *.c
+	gcc -g *.c
