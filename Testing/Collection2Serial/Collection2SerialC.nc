@@ -32,7 +32,6 @@ implementation {
       call RoutingControl.start();
       if (TOS_NODE_ID == 1) 
     call RootControl.setRoot();
-      else
     call Timer.startPeriodic(2000);
     }
   }
@@ -64,7 +63,7 @@ implementation {
   
   event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len) {
     call Leds.led1Toggle();    
-    printf("%02i: %03x!\n", ((TestMsg*)payload)->id, ((TestMsg*)payload)->data);
+    printf("%02i:%03d\n", ((TestMsg*)payload)->id, ((TestMsg*)payload)->data);
     printfflush();
     return msg;
   }
